@@ -21,11 +21,8 @@ def generateSecretKeyNacl():
          Returns:
         key (bytes)
     """
-
     key = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE)
-         return key
-
-
+    return key
 
 
 def generateSecretKeyTink():
@@ -94,7 +91,7 @@ def aeadEncryptTink(keyset_handle, message, associated_data):
         return ct
     else:
         return 'nah'
-     
+
 def aeadDecryptTink(ciphertext, associated_data, keyset_handle):
     """
     Decrypts a ciphertext using the keyset handle and associated data
@@ -109,7 +106,7 @@ def aeadDecryptTink(ciphertext, associated_data, keyset_handle):
     aead_primitive = keyset_handle.primitive(aead.Aead)
     plaintext = aead_primitive.decrypt(ciphertext, associated_data)
          return plaintext.decode()
-     
+
 def generateKeyPairNacl():
     """
     Uses NaCl to generate a public/private key pair
@@ -194,7 +191,7 @@ def hybridEncryptTink(message, associated_data, public_keyset_handle):
 
 def hybridDecryptTink(ciphertext, associated_data, private_keyset_handle):
     """
-    Decrypts ciphertext using private key. Requires passing associated_data for authentication.  
+    Decrypts ciphertext using private key. Requires passing associated_data for authentication.
     Parameters:
         ciphertext (bytes)
         associated_data (bytes)
@@ -233,7 +230,7 @@ def generateSignatureKeypairTink():
     pub = key_hndl.public_keyset_handle()
     return ( key_hndl , pub)
 
-     
+
 def signNacl(message, sigkey):
     """
     Uses NaCl to digitally sign a message using sigkey
@@ -262,7 +259,7 @@ def signTink(message, signing_keyset_handle):
     signee = signing_keyset_handle.primitive(signature.PublicKeySign)
     siggy_data = signee.sign(message)
     return siggy_data
-         
+
 def verifyNacl(message, tag, verifykey):
     """
     Verify the signature tag on a message using the verification key
@@ -335,7 +332,7 @@ def verifyMacNacl(message, tag, key):
         return True
     else:
         return False
-     
+
 def computeMacTink(message, mac_keyset_handle):
     """
     Computes a MAC on the message using the provided keyset handle           Notes: The returned tag should be compatible with the verifyMacTink() method below.
@@ -375,5 +372,45 @@ def verifyMacTink(message, tag, mac_keyset_handle):
 
 if __name__ == '__main__':
     print("Please implement the methods above using the appropriate cryptographic libraries. Assume library defaults if something is not specified")
+    aad = b"2022/11/28"
+    message = "Hello World"
 
+    nacl_key = generateSecretKeyNacl()
+    nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+    ciphertext_nacl = aeadEncryptNacl(nacl_key,message,aad,nonce)
+    print(aeadDecryptNacl(ciphertext_nacl,aad,nacl_key,nonce))
 
+    aead.register()
+    keyset_handle = tink.new_keyset_handle(aead.aead_key_templates.XCHACHA20_POLY1305)
+    # keyset_handle = generateSecretKeyTink()
+    ciphertext_tink = aeadEncryptTink(keyset_handle, message, aad)
+    print(aeadDecryptTink(ciphertext_tink, aad, keyset_handle))
+
+    keys = generateKeyPairNacl()
+    cipher = hybridEncryptNacl(message, keys[1])
+    print(hybridDecryptNacl(cipher[0], cipher[1], keys[0]))
+
+    tuple_tink = generateHybridEncryptionKeyPairTink()
+    publickey = tuple_tink[1]
+    c = hybridEncryptTink(message, aad, publickey)
+    privatekey = tuple_tink[0]
+    print(hybridDecryptTink(c, aad, privatekey))
+
+    temp = generateSignatureKeypairTink()
+    signature_data = signTink("test", temp[0])
+    verify_t = temp[1]
+    print(verifyTink("test", signature_data, verify_t))
+
+    sigkey = generateSignatureKeypairNacl()
+    tag = signNacl('test', sigkey[0])
+    print(verifyNacl('testt', tag, sigkey[1]))
+
+    nacl_key = generateSecretKeyNacl()
+    tag = computeMacNacl(message, nacl_key)
+    print(verifyMacNacl(message, tag, nacl_key))
+
+    mac.register()
+    keyset_handle = tink.new_keyset_handle(mac.mac_key_templates.HMAC_SHA256_128BITTAG)
+    mac_primitive = keyset_handle.primitive(mac.Mac)
+    temp = computeMacTink('test', mac_primitive)
+    print(verifyMacTink('test', temp, mac_primitive))
